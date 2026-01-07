@@ -1,0 +1,100 @@
+/* ---------------------------------------------------------
+   1) BASE MEASURES (Core KPIs)
+   --------------------------------------------------------- */
+
+-- ยอดขายรวม 
+Total Revenue = SUM( FactSales[TotalAmount] )
+
+-- จำนวนออเดอร์ทั้งหมด 
+Total Orders = DISTINCTCOUNT( FactSales[OrderID] )
+
+-- จำนวนลูกค้าทั้งหมดที่มาซื้อสินค้า
+Total Customers = DISTINCTCOUNT( FactSales[CustomerID] )
+
+-- ยอดขายเฉลี่ยต่อออเดอร์ (AOV)
+Average Order Value = DIVIDE( [Total Revenue], [Total Orders], 0 )
+
+-- รายได้ปีที่แล้ว (สำหรับการเทียบ YoY)
+YoY Revenue = 
+CALCULATE(
+    [Total Revenue],
+    SAMEPERIODLASTYEAR( DimDate[OrderDate] )
+)
+
+-- อัตราการเติบโตเทียบปีก่อนหน้า (YoY Growth)
+YoY Growth = DIVIDE( [Total Revenue] - [YoY Revenue], [YoY Revenue], 0 )
+
+
+/* ---------------------------------------------------------
+   2) CUSTOMER SEGMENT ANALYSIS (Focus: Regular Group)
+   --------------------------------------------------------- */
+
+-- :: Revenue Metrics ::
+Regular_Revenue = 
+CALCULATE(
+    [Total Revenue],
+    KEEPFILTERS( CustomerSegment[Segment] = "Regular" )
+)
+
+Pct_Revenue_Regular = DIVIDE( [Regular_Revenue], [Total Revenue], 0 )
+
+
+-- :: Customer Count Metrics ::
+Regular_Customers = 
+CALCULATE(
+    [Total Customers],
+    KEEPFILTERS( CustomerSegment[Segment] = "Regular" )
+)
+
+Pct_Customers_Regular = DIVIDE( [Regular_Customers], [Total Customers], 0 )
+
+
+/* ---------------------------------------------------------
+   3) SALES PERFORMANCE (Peak vs Average)
+   --------------------------------------------------------- */
+
+Peak Month Revenue =
+VAR SummaryTable =
+    SUMMARIZE(
+        VALUES( DimDate[YearMonth] ),
+        DimDate[YearMonth],
+        "@Rev", CALCULATE( [Total Revenue] )
+    )
+VAR TopRow = 
+    TOPN( 1, SummaryTable, [@Rev], DESC )
+RETURN
+    MAXX( TopRow, [@Rev] )
+
+Average Monthly Revenue =
+VAR MonthsInContext = DISTINCTCOUNT( DimDate[YearMonth] )
+VAR TotalRevInContext = [Total Revenue]
+RETURN
+    DIVIDE( TotalRevInContext, MonthsInContext, 0 )
+
+Peak vs Avg % =
+VAR PeakRev = [Peak Month Revenue]
+VAR AvgRev  = [Average Monthly Revenue]
+RETURN
+    DIVIDE( PeakRev - AvgRev, AvgRev, 0 )
+
+
+/* ---------------------------------------------------------
+   4) CATEGORY OPTIMIZATION (Top 3 Categories)
+   --------------------------------------------------------- */
+
+Top 3 Categories Revenue =
+CALCULATE (
+    [Total Revenue],
+    TOPN (
+        3,
+        VALUES ( DimProduct[ProductCategory] ),
+        [Total Revenue],
+        DESC
+    )
+)
+
+Top 3 Categories % =
+DIVIDE (
+    [Top 3 Categories Revenue],
+    [Total Revenue]
+)
